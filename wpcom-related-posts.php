@@ -2,7 +2,7 @@
 /*
 Plugin Name: WordPress.com Related Posts
 Plugin URI: http://automattic.com
-Description: Related posts using the WordPress.com Elastic Search infrastructure. Requires PHP 5.3.0 or newer.
+Description: Related posts using the WordPress.com Elastic Search infrastructure
 Author: Daniel Bachhuber
 Version: 0.0
 Author URI: http://automattic.com
@@ -25,12 +25,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 */
 
-/**
- * IMPORTANT: PHP 5.3.0+ is required as late static bindings are used to make it easier to extend the class.
- *
- * @see http://php.net/language.oop5.late-static-bindings
- *
- */
 class WPCOM_Related_Posts {
 
 	public $is_elastic_search = null;
@@ -49,18 +43,14 @@ class WPCOM_Related_Posts {
 
 	const key = 'wpcom-related-posts';
 
-	protected static $instance = null;
-	
-	protected static $in_the_content_filter = false;
-	protected static $loop = 0;
+	protected static $instance;
 
 	public static function instance() {
-		if( static::$instance === null  ) {
-			$class = get_called_class();
-			static::$instance = new static();
-			static::$instance->init();
+		if ( ! isset( self::$instance ) ) {
+			self::$instance = new WPCOM_Related_Posts;
+			self::$instance->init();
 		}
-		return static::$instance;
+		return self::$instance;
 	}
 
 	protected function __construct() {
@@ -69,31 +59,31 @@ class WPCOM_Related_Posts {
 
 	protected function init() {
 		$this->excluded_content_filter_hooks = apply_filters('wrp_excluded_content_filter_hooks', $this->excluded_content_filter_hooks);
-		static::$instance->setup_actions();
-		static::$instance->setup_filters();
-		do_action( 'wrp_init', get_called_class() );
+		self::$instance->setup_actions();
+		self::$instance->setup_filters();
+		do_action( 'wrp_init', __CLASS__ );
 	}
 
 	protected function setup_actions() {
 
-		add_action( 'init', array( static::$instance, 'action_init' ) );
-		add_action( 'wp_head', array( static::$instance, 'action_wp_head' ) );
+		add_action( 'init', array( self::$instance, 'action_init' ) );
+		add_action( 'wp_head', array( self::$instance, 'action_wp_head' ) );
 
-		add_action( 'admin_init', array( static::$instance, 'action_admin_init' ) );
-		add_action( 'admin_menu', array( static::$instance, 'action_admin_menu' ) );
+		add_action( 'admin_init', array( self::$instance, 'action_admin_init' ) );
+		add_action( 'admin_menu', array( self::$instance, 'action_admin_menu' ) );
 	}
 
 	protected function setup_filters() {
 
-		add_filter( 'the_content', array( static::$instance, 'filter_the_content' ) );
+		add_filter( 'the_content', array( self::$instance, 'filter_the_content' ) );
 	}
 
 	public function action_init() {
 
 		$this->default_options = array(
-				'post-types' => array(),
-			);
-		$this->options = get_option( static::key, $this->default_options );
+			'post-types' => array(),
+		);
+		$this->options = get_option( self::key, $this->default_options );
 
 		// If Elastic Search exists, let's use that
 		$es_path = WP_CONTENT_DIR . '/plugins/elasticsearch.php';
@@ -113,11 +103,10 @@ class WPCOM_Related_Posts {
 
 		// Elastic search can be spoofed outside of WordPress VIP
 		if( !defined( 'WPCOM_IS_VIP_ENV' ) || true !== WPCOM_IS_VIP_ENV ) {
-			$this->is_elastic_search = apply_filters('wrp_elastic_search_enabled', $this->is_elastic_search, get_called_class() );
+			$this->is_elastic_search = apply_filters('wrp_elastic_search_enabled', $this->is_elastic_search, __CLASS__ );
 		}
-
 		if ( false === $this->is_elastic_search )
-			add_action( 'admin_notices', array( static::$instance, 'admin_notice_no_index' ) );
+			add_action( 'admin_notices', array( self::$instance, 'admin_notice_no_index' ) );
 
 	}
 
@@ -127,21 +116,21 @@ class WPCOM_Related_Posts {
 
 	public function action_admin_init() {
 
-		register_setting( static::key, static::key, array( static::$instance, 'sanitize_options' ) );
-		add_settings_section( 'general', false, '__return_false', static::key );
-		add_settings_field( 'post-types', __( 'Enable for these post types:', 'wpcom-related-posts' ), array( static::$instance, 'setting_post_types' ), static::key, 'general' );
+		register_setting( self::key, self::key, array( self::$instance, 'sanitize_options' ) );
+		add_settings_section( 'general', false, '__return_false', self::key );
+		add_settings_field( 'post-types', __( 'Enable for these post types:', 'wpcom-related-posts' ), array( self::$instance, 'setting_post_types' ), self::key, 'general' );
 	}
 
 	public function action_admin_menu() {
 
-		add_options_page( __( 'WordPress.com Related Posts', 'wpcom-related-posts' ), __( 'Related Posts', 'wpcom-related-posts' ), $this->options_capability, static::key, array( static::$instance, 'view_settings_page' ) );
+		add_options_page( __( 'WordPress.com Related Posts', 'wpcom-related-posts' ), __( 'Related Posts', 'wpcom-related-posts' ), $this->options_capability, self::key, array( self::$instance, 'view_settings_page' ) );
 	}
 
 	public function setting_post_types() {
 		$all_post_types = get_post_types( array( 'publicly_queryable' => true ), 'objects' );
 		foreach( $all_post_types as $post_type ) {
 			echo '<label for="' . esc_attr( 'post-type-' . $post_type->name ) . '">';
-			echo '<input id="' . esc_attr( 'post-type-' . $post_type->name ) . '" type="checkbox" name="' . static::key . '[post-types][]" ';
+			echo '<input id="' . esc_attr( 'post-type-' . $post_type->name ) . '" type="checkbox" name="' . self::key . '[post-types][]" ';
 			if ( ! empty( $this->options['post-types'] ) && in_array( $post_type->name, $this->options['post-types'] ) )
 				echo ' checked="checked"';
 			echo ' value="' . esc_attr( $post_type->name ) . '" />&nbsp&nbsp;';
@@ -169,8 +158,8 @@ class WPCOM_Related_Posts {
 		<h2><?php _e( 'WordPress.com Related Posts', 'wpcom-related-posts' ); ?></h2>
 		<p><?php _e( 'Related posts for the bottom of your content using WordPress.com infrastructure', 'wpcom-related-posts' ); ?></p>
 		<form action="options.php" method="POST">
-			<?php settings_fields( static::key ); ?>
-			<?php do_settings_sections( static::key ); ?>
+			<?php settings_fields( self::key ); ?>
+			<?php do_settings_sections( self::key ); ?>
 			<?php submit_button(); ?>
 		</form>
 	</div>
@@ -191,27 +180,27 @@ class WPCOM_Related_Posts {
 		<?php
 	}
 
-	 /**
-	  * Retrieve the name of a filter currently being processed.
-	  * Used to prevent infinite loops in the filter_the_content()
-	  *
-	  * The function current_filter() only returns the most recent filter
-	  * or action being executed. did_action() returns true once the action
-	  * is initially processed. This function allows detection for any filter
-	  * currently being executed (despite not being the most recent filter to
-	  * fire, in the case of hooks called from hook callbacks) to be verified.
-	  *
-	  * @see current_filter()
-	  * @see did_action()
-	  * @see http://core.trac.wordpress.org/ticket/14994
-	  *
-	  * @param $filter string|array Optional. Filter or array of filters to
-	  * 	check. Defaults to null, which checks if any filter is currently
-	  * 	being run.
-	  *
-	  * @return bool|string Whether the filter is currently in the stack
-	  * 	or the matching filter name if an array was passed.
-	  */
+	/**
+	 * Retrieve the name of a filter currently being processed.
+	 * Used to prevent infinite loops in the filter_the_content()
+	 *
+	 * The function current_filter() only returns the most recent filter
+	 * or action being executed. did_action() returns true once the action
+	 * is initially processed. This function allows detection for any filter
+	 * currently being executed (despite not being the most recent filter to
+	 * fire, in the case of hooks called from hook callbacks) to be verified.
+	 *
+	 * @see current_filter()
+	 * @see did_action()
+	 * @see http://core.trac.wordpress.org/ticket/14994
+	 *
+	 * @param $filter string|array Optional. Filter or array of filters to
+	 * 	check. Defaults to null, which checks if any filter is currently
+	 * 	being run.
+	 *
+	 * @return bool|string Whether the filter is currently in the stack
+	 * 	or the matching filter name if an array was passed.
+	 */
 	protected function doing_filter( $filter = null ) {
 		global $wp_current_filter;
 
@@ -244,15 +233,16 @@ class WPCOM_Related_Posts {
 		}
 
 		// Don't attempt to retrieve related posts if we're in an excluded action/filter
-		if( static::doing_filter($excluded_content_filter_hooks) ) {
+		if( self::doing_filter($excluded_content_filter_hooks) ) {
 			return $the_content;
 		}
 
-		$related_posts = static::get_related_posts();
+		$related_posts = self::get_related_posts();
 		$related_posts_html = array(
-				'<div class="wpcom-related-posts" id="' . esc_attr( 'wpcom-related-posts-' . get_the_ID() ) . '">',
-				'<ul>',
-			);
+			'<div class="wpcom-related-posts" id="' . esc_attr( 'wpcom-related-posts-' . get_the_ID() ) . '">',
+			'<ul>',
+		);
+
 		foreach( $related_posts as $related_post ) {
 			$related_posts_html[] = '<li>';
 			if ( has_post_thumbnail( $related_post->ID ) )
@@ -281,32 +271,33 @@ class WPCOM_Related_Posts {
 			$post_id = get_the_ID();
 
 		$defaults = array(
-				'posts_per_page'          => 5,
-				'post_type'               => get_post_type( $post_id ),
-			);
+			'posts_per_page'          => 5,
+			'post_type'               => get_post_type( $post_id ),
+		);
+
 		$args = wp_parse_args( $args, $defaults );
 
 		$related_posts = array();
 
 		// Remove the_content filter while gathering related posts to prevent accidental infinite loops
-		if( $have_content_filter = has_filter( 'the_content', array( static::$instance, 'filter_the_content' ) ) ) {
-			remove_filter( 'the_content', array( static::$instance, 'filter_the_content', $have_content_filter ) );
+		if( $have_content_filter = has_filter( 'the_content', array( self::$instance, 'filter_the_content' ) ) ) {
+			remove_filter( 'the_content', array( self::$instance, 'filter_the_content', $have_content_filter ) );
 		}
 
 		// Use Elastic Search for the results if it's available
 		if ( $this->is_elastic_search ) {
 			$current_post = get_post( $post_id );
-			$keywords = static::get_keywords( $current_post->post_title ) + static::get_keywords( $current_post->post_content ) ;
+			$keywords = $this->get_keywords( $current_post->post_title ) + $this->get_keywords( $current_post->post_content ) ;
 			$query = implode( ' ', array_unique( $keywords ) );
 			$es_args = array(
 					'more_like_this'          => array(
-							'like_text'       => $query,
-							'min_term_freq'   => 1,
-							'max_query_terms' => 12,
-						),
-					'name'                => parse_url( site_url(), PHP_URL_HOST ),
-					'size'                => (int)$args['posts_per_page'] + 1,
-				);
+						'like_text'       => $query,
+						'min_term_freq'   => 1,
+						'max_query_terms' => 12,
+					),
+				'name'                => parse_url( site_url(), PHP_URL_HOST ),
+				'size'                => (int)$args['posts_per_page'] + 1,
+			);
 			if ( is_array( $args['post_type'] ) ) {
 				// @todo support for a set of post types
 			} else if ( in_array( $args['post_type'], get_post_types() ) && 'all' != $args['post_type'] ) {
@@ -315,7 +306,6 @@ class WPCOM_Related_Posts {
 			$es_args = apply_filters( 'wrp_es_api_search_index_args', $es_args, $current_post );
 			$related_es_query = es_api_search_index( $es_args, 'related-posts' );
 			$related_es_query = apply_filters( 'wrp_es_query_results', $related_es_query, $es_args, $current_post );
-
 			$related_posts = array();
 			if ( is_array( $related_es_query ) && ! empty( $related_es_query['results']['hits'] ) ) {
 				foreach( $related_es_query['results']['hits'] as $hit ) {
@@ -344,7 +334,7 @@ class WPCOM_Related_Posts {
 			$related_posts = $related_query->get_posts();
 		}
 		if( $have_content_filter ) {
-			add_filter( 'the_content', array( static::$instance, 'filter_the_content' ), $have_content_filter );
+			add_filter( 'the_content', array( self::$instance, 'filter_the_content' ), $have_content_filter );
 		}
 		return $related_posts;
 	}
@@ -375,12 +365,7 @@ class WPCOM_Related_Posts {
 
 }
 
-/**
- * Pluggable: Replace with an empty function if extending the class or to avoid automatic instantiation
- */
-if( !function_exists('WPCOM_Related_Posts') ) {
-	function WPCOM_Related_Posts() {
-		return WPCOM_Related_Posts::instance();
-	}
+function WPCOM_Related_Posts() {
+	return WPCOM_Related_Posts::instance();
 }
 add_action( 'plugins_loaded', 'WPCOM_Related_Posts' );
