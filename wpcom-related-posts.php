@@ -228,33 +228,36 @@ class WPCOM_Related_Posts {
 		$excluded_content_filter_hooks = apply_filters('wrp_excluded_content_filter_hooks_runtime', $this->excluded_content_filter_hooks, $the_content);
 		
 		// Related posts should only be appended on the main loop for is_singular() of acceptable post types
-		if ( $wp_query !== $wp_the_query || ! in_array( get_post_type(), $this->options['post-types'] ) || ! is_singular( get_post_type() ) ) {
+		if ( ! is_main_query() || ! in_the_loop() || ! in_array( get_post_type(), $this->options['post-types'] ) || ! is_singular( get_post_type() ) )
 			return $the_content;
-		}
 
 		// Don't attempt to retrieve related posts if we're in an excluded action/filter
 		if( self::doing_filter($excluded_content_filter_hooks) ) {
 			return $the_content;
 		}
 
-		$related_posts = self::get_related_posts();
+		$related_posts = $this->get_related_posts();
 		$related_posts_html = array(
 			'<div class="wpcom-related-posts" id="' . esc_attr( 'wpcom-related-posts-' . get_the_ID() ) . '">',
-			'<ul>',
 		);
 
-		foreach( $related_posts as $related_post ) {
-			$related_posts_html[] = '<li>';
-			if ( has_post_thumbnail( $related_post->ID ) )
-				$related_posts_html[] = '<a href="' . esc_url( get_permalink( $related_post->ID ) ) . '">' . get_the_post_thumbnail( $related_post->ID ) . '</a>';
+		if ( $related_posts ) {
+			$related_posts_html[] = '<ul>';
+			foreach( $related_posts as $related_post ) {
+				$related_posts_html[] = '<li>';
 
-			$related_posts_html[] = '<a href="' . esc_url( get_permalink( $related_post->ID ) ) . '">' . apply_filters( 'the_title', $related_post->post_title ) . '</a>';
-			$related_posts_html[] = '</li>';
+				if ( has_post_thumbnail( $related_post->ID ) ) {
+					$related_posts_html[] = '<a href="' . get_permalink( $related_post->ID ) . '">' . get_the_post_thumbnail( $related_post->ID ) . '</a>';
+				}
+
+				$related_posts_html[] = '<a href="' . get_permalink( $related_post->ID ) . '">' . apply_filters( 'the_title', $related_post->post_title ) . '</a>';
+				$related_posts_html[] = '</li>';
+			}
+			$related_posts_html[] = '</ul>';
 		}
-		$related_posts_html[] = '</ul>';
-		$related_posts_html[] = '</div>';
 
-		return $the_content . implode( PHP_EOL, $related_posts_html );
+		$related_posts_html[] = '</div>';
+		return $the_content . implode( PHP_EOL, $related_posts_html );
 	}
 
 	/**
@@ -267,7 +270,7 @@ class WPCOM_Related_Posts {
 	 * @return array $related_posts An array of related WP_Post objects
 	 */
 	public function get_related_posts( $post_id = null, $args = array(), &$raw_es_query=0 ) {
-		if ( empty( $post_id ) )
+		if ( is_null( $post_id ) )
 			$post_id = get_the_ID();
 
 		$defaults = array(
